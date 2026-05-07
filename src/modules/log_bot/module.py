@@ -95,8 +95,28 @@ class LogBotModule:
                 link_preview=False,
                 parse_mode='md'
             )
+            await asyncio.sleep(0.5)  # Rate limit koruması
         except Exception as e:
-            logger.error(f"Log gönderme hatası: {e}")
+            error_str = str(e)
+            if "A wait of" in error_str and "seconds is required" in error_str:
+                import re
+                wait_match = re.search(r'wait of (\d+)', error_str)
+                wait_time = int(wait_match.group(1)) if wait_match else 30
+                logger.warning(f"FloodWait: {wait_time}sn bekleniyor...")
+                await asyncio.sleep(wait_time + 1)
+                # Tekrar dene
+                try:
+                    await self.client.send_message(
+                        self.config.log_group_id,
+                        text,
+                        file=file,
+                        link_preview=False,
+                        parse_mode='md'
+                    )
+                except Exception as retry_e:
+                    logger.error(f"Retry sonrası hata: {retry_e}")
+            else:
+                logger.error(f"Log gönderme hatası: {e}")
 
     async def cache_new_message(self, event):
         """Yeni mesajları cache'le"""
